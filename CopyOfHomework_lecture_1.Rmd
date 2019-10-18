@@ -1,0 +1,74 @@
+---
+title: "Homework lecture 1"
+author: "Ola T. Øritsland"
+date: '`r lubridate::today()`'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggridges)
+library(data.table)
+# Get data
+base_url <- "http://data.urbansharing.com/bergenbysykkel.no/trips/v1/2018/"
+months <- seq(6, 12)
+list_urls <- paste0(base_url, sprintf('%0.2d', months), ".csv")
+
+df_raw <- map_df(list_urls, ~ read_csv(.x))
+
+# Clean data
+# Remove trips to service stations
+# Remove trips that start and end same place
+df <- df_raw %>% 
+  filter(!(end_station_name %in% c("workshop", "UIP"))) %>% 
+  filter(duration < 3600) %>% 
+  filter(start_station_name != end_station_name) 
+
+# Add variables
+# Merk: geosphere er egen pakke, last ned på forhånd med install.packages("geosphere")
+df <- df %>% 
+  mutate(duration_minutes = duration %/% 60,
+         month = month(started_at),
+         wday = factor(wday(started_at)),
+         time_of_day_started = hour(started_at),
+         distance_trip = round(geosphere::distCosine(cbind(start_station_longitude, start_station_latitude),
+                                            cbind(end_station_longitude, end_station_latitude))))
+
+# smaller dataset containing only trips started at the most popular station
+df_mdp <- df %>% 
+  filter(start_station_name == "Møllendalsplass")
+
+## Data.table
+dt <- as.data.table(df)
+dt_mdp <- as.data.table(df_mdp)
+```
+
+## 1. Data transformation
+
+### 1.1 Fart
+
+```{r fart}
+dt_mdp[ , average_speed_kph := distance_trip/1000*duration_minutes]
+```
+
+### 1.2 Strekning
+
+```{r strekning}
+dt_mdp[ , .N, by = .(start_station_name, end_station_name)][order(-N)][1:10]
+```
+
+### 1.3 Flest besøk
+
+```{r}
+
+dt_10 <- rbind(dt_mdp[ , .N, by = start_station_name],
+      dt_mdp[ , .N, by = end_station_name], use.names = FALSE)[order(-N)][1:10]
+
+colnames(dt_10)[1] <- "stationName"
+
+dt_10
+```
+
+### 1.4 Regn
+

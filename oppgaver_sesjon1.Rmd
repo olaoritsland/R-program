@@ -1,0 +1,231 @@
+---
+title: "Oppgaver til leksjon 1 uten fasit"
+author: "André Waage Rivenæs"
+date: "1 10 2019"
+output: html_document
+---
+Først laster vi inn pakker. Hvis dere mangler noen av pakkene under, må dere først skrive install.packages("pakkenavn") i konsollen, også kan dere kjøre kodesnutten under. 
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(purrr)
+library(readxl)
+
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Data import og vasking
+
+a) 
+Les inn Excel-filen “untidy_cashflow.xlsx” med hjelp av read_xlsx. Husk å spesifisere hvilke celler dere vil lese fra! Bruk: library(readxl). For hjelp skriv ?read_xlsx. 
+
+Husk å legge excel-filen i samme område hvor dere har opprettet RStudio-prosjektet. Dette tillater at du kan lese inn filen ved å skrive kun navnet på filen, istedenfor å måtte angi hele stien. 
+
+Merk at all kode skrives i de grå feltene under. 
+
+```{r}
+cf <- read_excel("untidy_cashflow.xlsx", skip = 7) %>% select(-"Sum:")
+```
+
+
+b)
+Gjør dataen tidy ved hjelp av pivot_wider og/eller pivot_longer. Husk reglene:
+
+- hver variabel er en kolonne
+- hver observasjon er en rad
+- i en tabell er det kun en type “observasjonsenhet”
+
+PS: Det er her (minst) to mulige løsninger. Den ene er best for plotting, mens den andre er mer tidy og egnet for modellering o.l. 
+
+```{r}
+cf %>%
+  pivot_longer(-År,names_to = "year") %>% 
+  pivot_wider(names_from = År)
+```
+
+
+# Datatransformasjon
+Først leser vi inn data (trenger ikke endre noe her, men pass på at filen bysykkeldata.Rds ligger under en subfolder kalt "data"). 
+```{r setup data, include=FALSE}
+# base_url <- "http://data.urbansharing.com/bergenbysykkel.no/trips/v1/2018/"
+# months <- seq(6, 12)
+# list_urls <- paste0(base_url, sprintf('%0.2d', months), ".csv")
+# 
+# df_raw <- map_df(list_urls, ~ read_csv(.x)) 
+# 
+# df <- df_raw %>%
+#   mutate(distance_trip = round(geosphere::distCosine(cbind(start_station_longitude, start_station_latitude),
+#                                             cbind(end_station_longitude, end_station_latitude))))
+# saveRDS(df, file = "data/bysykkeldata.Rds")
+
+df <- readRDS("data/bysykkeldata.Rds")
+```
+
+## Filtrering og seleksjon
+
+a) Fjern sykkelturer som endte i "workshop" eller "UIP". Disse er ikke vanlige stasjoner. Bruk funksjonen "filter" fra dplyr. 
+b) Fjern sykkelturer med varighet lenger enn 3600 sekunder.
+c) Lag en ny dataframe kalt dates_only hvor du kun velger kolonnene started_at og ended_at. 
+
+```{r}
+df %>% 
+  filter(end_station_name != "UIP",
+         end_station_name != "workshop",
+         duration <= 3600)
+
+dates_only <- df %>% 
+  select(started_at, ended_at)
+
+
+```
+
+## Mutate
+Legg til følgende variabler i df ved å bruke mutate:
+
+- Varighet i minutter (du har sekunder)
+- Måned turen startet (bruk lubridate::month)
+- Ukedag turen startet (bruk lubridate::day)
+- Tidspunkt på dagen da turen startet (bruk lubridate::hour)
+- En indikator på om turen ble gjennomført i helgen (lørdag/søndag), som er enten TRUE eller FALSE
+
+
+```{r}
+df <- df %>% 
+  mutate(duration_min = duration %/% 60,
+         month = lubridate::month(started_at),
+         day = lubridate::day(started_at),
+         time = lubridate::hour(started_at),
+         wday = lubridate::wday(started_at, label = TRUE),
+         weekend = if_else(wday == "lør\\." | wday == "søn\\.", TRUE, FALSE))
+
+```
+
+## Gruppering og summarise
+
+a) Grupper etter ukedag. Hvilken ukedag har flest sykkelturer? Bruk group_by + summarise og tellefunksjonen n().
+b) Grupper etter endestasjon. Hvilken endestasjon har de lengste turene i snitt? Sorter resultatet etter gjennomsnittlig durasjon ved å bruke arrange.
+
+```{r}
+df %>% 
+  group_by(wday) %>% 
+  summarise(n = n())
+
+df %>% 
+  group_by(end_station_name) %>% 
+  summarise(MeanDuration = mean(duration)) %>% 
+  arrange(desc(MeanDuration))
+```
+
+# Visualisering
+
+```{r}
+df_mdp <- df %>% 
+  filter(start_station_name == "Møllendalsplass")
+```
+
+## Scatter plots
+Bruk det mindre datasettet df_mdp (generert i kodesnutten over) for oppgavene under.
+
+### a) Visualiser sammenhengen mellom durasjon og lengde på tur med et scatter plot
+
+Hint: Bruk geom_point
+```{r}
+df_mdp %>% 
+  ggplot(aes(distance_trip, duration_min)) + 
+  geom_point()
+```
+
+
+### b) Samme som i a), men bruk geom_jitter i stedet for geom_point
+
+```{r}
+df_mdp %>% 
+  ggplot(aes(distance_trip, duration)) + 
+  geom_jitter()
+```
+
+### c) Legg til farge og transparens
+Hint: geom-funksjonene tar inn argumenter. alpha = [et tall mellom 0 og 1] og color = "[navn på en farge]" styrer transparens og farge på punkter.
+```{r}
+df_mdp %>% 
+  ggplot(aes(distance_trip, duration)) + 
+  geom_jitter(color = 'blue', alpha = 0.2)
+
+```
+
+### d) Samme som i b), men vis bare turer som varte i 30 minutter eller mindre
+Bruk ylim(). Argumentet til ylim er en vektor med laveste grense som første element og øvre grense som andre element.En vektor lages med funksjonen c(). 
+```{r}
+df_mdp %>% 
+  filter(duration_min <= 30) %>% 
+  ggplot(aes(distance_trip, duration)) + 
+  geom_jitter(color = 'cornflowerblue', alpha = 0.2)
+
+df_mdp %>% 
+  ggplot(aes(distance_trip, duration_min)) + 
+  geom_jitter(color = 'cornflowerblue', alpha = 0.2) +
+  ylim(0,30)
+
+```
+
+### e) Legg til farger til punktene for å visualisere hvilket tidspunkt på døgnet turen ble gjennomført
+Hint: color er også et argument til aes()-funksjonen. Sett color = tidspunkt_tur_startet, og ggplot vil på magisk vis mappe farge til tidspunkt. Ser du noe interessant?
+
+```{r}
+df_mdp %>% 
+  ggplot(aes(distance_trip, duration_min, color = time)) + 
+  geom_jitter(alpha = 0.2) +
+  ylim(0,30)
+```
+
+### f) Legg til en trendlinje til plottet i c)
+Bruk geom_smooth
+```{r}
+df_mdp %>% 
+  ggplot(aes(distance_trip, duration_min, color = time)) + 
+  geom_jitter(alpha = 0.2) +
+  ylim(0,30) +
+  geom_smooth()
+```
+
+## Histogrammer
+Bruk hele datasettet (df) for denne delen.
+
+### a) Bruk et histogram for å visualisere distribusjonen til tidspunktet på dagen hvor turer starter
+Bruk geom_histogram
+```{r}
+df %>% 
+  ggplot(aes(time)) + 
+  geom_histogram(bins = 40)
+```
+
+### b) Som i a), men la hver bin representere en time
+Skriv "?geom_histogram" i konsollen for å lære hvordan du kan styre antall bins. 
+Hint: Syklene er bare tilgjengelig mellom 05:00 - 24:00.
+```{r}
+df %>% 
+  ggplot(aes(time)) + 
+  geom_histogram(bins = 40)
+```
+
+### c) Legg til en farge til plottet i b)
+Prøv "cornflowerblue", "coral2" eller "forestgreen". Forsøk å erstatte color-argumentet med fill.
+```{r}
+df %>% 
+  ggplot(aes(time)) + 
+  geom_histogram(bins = 40, fill = 'cornflowerblue')
+```
+
+## Density plots
+
+### a) Lag et density plot som visualiserer distribusjonen til turenes varighet
+```{r}
+df %>% 
+  ggplot(aes(duration_min)) + 
+  geom_density(fill = 'cornflowerblue', alpha = 0.5)
+
+df %>% 
+  ggplot(aes(duration_min)) + 
+  geom_density(aes(fill = weekend), alpha = 0.5)
+```

@@ -1,0 +1,319 @@
+---
+title: "Homework lecture 1"
+author: "Ola T. Øritsland"
+date: '`r lubridate::today()`'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggridges)
+# Get data
+base_url <- "http://data.urbansharing.com/bergenbysykkel.no/trips/v1/2018/"
+months <- seq(6, 12)
+list_urls <- paste0(base_url, sprintf('%0.2d', months), ".csv")
+
+df_raw <- map_df(list_urls, ~ read_csv(.x))
+
+# Clean data
+# Remove trips to service stations
+# Remove trips that start and end same place
+df <- df_raw %>% 
+  filter(!(end_station_name %in% c("workshop", "UIP"))) %>% 
+  filter(duration < 3600) %>% 
+  filter(start_station_name != end_station_name) 
+
+# Add variables
+# Merk: geosphere er egen pakke, last ned på forhånd med install.packages("geosphere")
+df <- df %>% 
+  mutate(duration_minutes = duration %/% 60,
+         month = month(started_at),
+         wday = factor(wday(started_at)),
+         time_of_day_started = hour(started_at),
+         distance_trip = round(geosphere::distCosine(cbind(start_station_longitude, start_station_latitude),
+                                            cbind(end_station_longitude, end_station_latitude))))
+
+# smaller dataset containing only trips started at the most popular station
+df_mdp <- df %>% 
+  filter(start_station_name == "Møllendalsplass")
+```
+
+## 1. Data transformation
+
+### 1.1 Fart
+
+```{r fart}
+
+## Tidy
+df_mdp <- df_mdp %>% 
+  mutate(average_speed_kph = distance_trip/1000*duration_minutes)
+
+```
+
+### 1.2 Strekning
+
+```{r strekning}
+df_mdp %>% 
+  group_by(start_station_name, end_station_name) %>% 
+  summarise(n = n()) %>% 
+  arrange(-n) %>% 
+  top_n(10)
+```
+
+### 1.3 Flest besøk
+
+```{r}
+df_top10 <- df_mdp %>%
+  select(start_station_name, end_station_name, duration_minutes) %>% 
+  pivot_longer(-duration_minutes) %>% 
+  group_by(value) %>% 
+  summarise(n = n()) %>% 
+  arrange(-n) %>% 
+  top_n(10) %>% 
+  print()
+```
+
+### 1.4 Regn
+
+```{r}
+rain <- read_csv("rain.csv")
+
+df_filtered <- df %>% 
+  filter(started_at>="2018-07-01") %>% 
+  mutate(date = date(started_at)) %>% 
+  left_join(rain, by = "date") %>% 
+  mutate(rain_category = case_when(rain == 0 ~ "Ingen regn", 
+                                   rain < 5 ~ "Litt regn", 
+                                   rain > 5 ~ "Mye regn"))
+
+df_filtered %>% 
+  group_by(rain_category) %>% 
+  summarise(n = n(), "%" = round(n/nrow(df)*100,2)) %>% 
+  print()
+```
+
+
+### 1.5 Regnkategori
+
+```{r}
+df_filtered %>% 
+  group_by(rain_category) %>% 
+  summarise(AvgDuration = mean(duration))
+```
+
+
+## 2. Datavasking
+
+### 2.1 Tell og spre
+
+```{r}
+df %>% 
+  select(start_station_name, end_station_name) %>% 
+  group_by(start_station_name, end_station_name) %>% 
+  summarise(n = n()) %>% 
+  arrange(-n) %>% 
+  pivot_wider(names_from = end_station_name, values_from = n)
+```
+
+### 2.2 Samling
+
+```{r}
+df %>% 
+  select(start_station_name, end_station_name) %>% 
+  mutate(id = row_number()) %>% 
+  pivot_longer(-id)
+```
+
+
+## Visualisering
+
+### 3.1 Density
+
+```{r}
+df_top_stations <- df %>% 
+  filter(start_station_name %in% df_top10$value | end_station_name %in% df_top10$value)
+
+p_top10 <- df_top_stations %>% 
+  filter(start_station_name %in% df_top10$value & end_station_name %in% df_top10$value)
+
+p_top10 %>% 
+  ggplot(aes(duration)) +
+  geom_density(aes(fill = end_station_name)) +
+  facet_wrap(end_station_name ~ ., dir = "v")
+  
+```
+
+### 3.2 Ridges 
+
+```{r}
+p_top10 %>% 
+  ggplot(aes(duration, end_station_name, fill = as.factor(end_station_name))) +
+  geom_density_ridges_gradient() 
+```
+
+
+### 3.3 Sortering
+
+```{r}
+p_top10 %>% 
+  mutate(end_station_name = fct_reorder(end_station_name, duration, .fun = median)) %>% 
+  ggplot(aes(duration, end_station_name,  fill = as.factor(end_station_name))) +
+  geom_density_ridges_gradient(show.legend = FALSE) 
+```
+
+
+### 3.4 Grusomt barplott
+
+```{r}
+p_top10_bar <- p_top10 %>% 
+  group_by(start_station_name) %>% 
+  summarise(med_dur = median(duration)) 
+
+p_top10_bar %>% 
+  ggplot(aes(start_station_name, med_dur)) +
+  geom_bar(stat = 'identity', fill = 'steelblue')
+  
+  
+```
+
+
+### 3.5 Fiks barplottet
+
+```{r}
+p_top10_bar %>% 
+  mutate(start_station_name = fct_reorder(start_station_name, med_dur, .desc = TRUE)) %>% 
+  ggplot(aes(start_station_name, med_dur)) +
+  geom_bar(stat = 'identity', fill = 'forestgreen') +
+  geom_label(aes(label = med_dur), hjust = 1.2) +
+  ylab(label = "Median duration (seconds)") +
+  xlab(label = "Start station") +
+  # geom_text(aes(label = med_dur), hjust = 1.2) +
+  coord_flip() +
+  theme_minimal()
+```
+
+
+### 3.6 Opphetet diskusjon
+
+```{r}
+# Inkluderer kun strekninger som enten begynte eller sluttet ved en av de 10 mest populære stasjonene.
+p <- df_filtered %>%
+  mutate(distance_trip_km = distance_trip/1000,
+         duration_hour = duration/3600,
+         kph = distance_trip_km/duration_hour) %>% 
+  filter(start_station_name %in% df_top10$value, 
+         end_station_name %in% df_top10$value) %>% 
+  filter(kph < 20,
+         kph > 2)
+
+p %>% 
+  filter(duration < 1300) %>% 
+  ggplot(aes(rain, duration)) +
+  geom_point(alpha = 0.1, color = 'forestgreen') +
+  geom_smooth(color = 'black') +
+  theme_minimal()
+
+p %>% 
+  ggplot(aes(rain, kph)) +
+  geom_point(alpha = 0.1, color = 'forestgreen') +
+  geom_smooth(color = 'black') +
+  theme_minimal()
+
+p %>% 
+  mutate(duration_grp = case_when(distance_trip_km < 0.5 ~ "< 500m",
+                                  distance_trip_km < 1 ~ "500m - 999m",
+                                  distance_trip_km <= 2 ~ "1km - 2km",
+                                  distance_trip_km > 2 ~ "> 2km")) %>% 
+  ggplot(aes(rain, kph)) +
+  geom_point(alpha = 0.1, color = 'forestgreen') +
+  geom_smooth(color = 'black') +
+  facet_grid(.~ duration_grp) +
+  theme_minimal()
+
+
+
+```
+
+
+### 3.7 GIF
+
+```{r}
+library(gganimate)
+
+p <- df_mdp %>% 
+  select(started_at) %>% 
+  mutate(date = date(started_at)) %>% 
+  group_by(date) %>% 
+  summarise(numberOfTrips = n())
+
+ggplot(p, aes(date, numberOfTrips)) +
+  geom_line(color = 'forestgreen', size = .5) +
+  theme_minimal() +
+  labs(title = "Antall turer fra Møllendal over tid") +
+  transition_reveal(date)
+```
+
+
+### 3.8 Nettverk
+
+```{r}
+library(visNetwork)
+
+ID = "Sandviksbodene"
+
+data <- df %>% 
+  filter(start_station_name==ID) %>% 
+  group_by(start_station_name, end_station_name) %>% 
+  summarise(n = n(), mean.distance = mean(distance_trip)) %>% 
+  mutate(share = n/sum(n))
+
+
+nodes <- data.frame(
+  id = unique(c(data$start_station_name,
+           data$end_station_name))
+)
+
+nodes <- nodes %>% 
+  mutate(label = nodes$id,
+         title = nodes$id)
+
+edges <- data.frame(
+  from = data$start_station_name,
+  to = data$end_station_name,
+  width = data$share*100,
+  length = data$mean.distance/10
+)
+
+visNetwork(nodes, edges)
+
+
+```
+
+
+### 3.9 Fri oppgave
+
+```{r}
+
+map <- df %>% 
+  rename(id = start_station_name, lat = start_station_latitude, long = start_station_longitude) %>% 
+  group_by(id, lat, long) %>% 
+  summarise(n = n())
+
+
+library(leaflet)
+
+map %>% 
+  leaflet() %>% 
+  addTiles() %>% 
+  addCircles(lng = ~ long, 
+             lat = ~ lat,
+             fillColor = aes(n),
+             radius = ~ n/nrow(map), 
+             popup = ~ paste(id, n),
+             fill = TRUE) %>% 
+  addScaleBar(position = "bottomleft") 
+
+```
+
+
