@@ -342,22 +342,32 @@ df_stocks %>%
 
 
 ## 13 Navngivning
-
-f1 <- function(string, prefix) {
+has_prefix <- function(string, prefix) {
   substr(string, 1, nchar(prefix)) == prefix
 }
-
-f2 <- function(x) {
+remove_last_value <- function(x) {
   if (length(x) <= 1) return(NULL)
   x[-length(x)]
 }
-
-f3 <- function(x, y) {
+replicate_y_to_length_of_x <- function(x, y) {
   rep(y, length.out = length(x))
 }
-
-f4 <- function(x, y, z) {
+max_min <- function(x, y, z) {
   pmin(pmax(x, y), z)
 }
 
+## 14 Bli kvitt for-løkken
+str_c(letters, collapse = "")
+sd(x)
+x <- runif(100)
+out <- cumsum(x)
+
+## 15 Feilmeldinger
+
+
+## 16 Lag en eksisterende funksjon
+which_max <- function(x) {
+  which(max(x) == x)
+}
+which_max(runif(10, 0, 10))
 
