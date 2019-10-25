@@ -303,22 +303,6 @@ df_stocks %>%
   theme_bw()
 
 ## 12 Rescale
-df_stocks <- reshape::merge_recurse(list_of_df)
-
-df_stocks %>% 
-  select(Dato, contains("Close")) %>% 
-  pivot_longer(-Dato, names_to = "Stock", values_to = "Close") %>% 
-  arrange(Dato) %>%
-  group_by(Stock) %>% 
-  mutate(r_factor = if_else(Dato == "2019-01-02", 100, Close/lag(Close)),
-         r_cum = cumprod(r_factor),
-         Dato = date(Dato)) %>% 
-  
-  #plot
-  ggplot(aes(Dato, r_cum, col = Stock, group = Stock)) +
-  geom_line() +
-  theme_bw()
-
 rescale_close <- function(close, rescale_date, date_col) {
   
   r_factor = if_else(date_col == rescale_date, 100, close/lag(close))
@@ -441,20 +425,6 @@ mod_ranger %>%
 }
 plot_importance(mod_ranger)
 
-## 20
-
-model_lm <- lm(mpg ~ ., data = mtcars)
-model_rf <- ranger::ranger(mpg ~ ., data = mtcars)
-
-df <- tibble(truth = mtcars$mpg, 
-             pred1 = model_lm$fitted.values, 
-             pred2 = model_rf$predictions)
 
 
-dual_lift <- function(.data) {
-  
-  .data %>% 
-    mutate(diff = pred1 - pred2)
-    
-}
 
