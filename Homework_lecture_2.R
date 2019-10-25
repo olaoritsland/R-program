@@ -371,3 +371,90 @@ which_max <- function(x) {
 }
 which_max(runif(10, 0, 10))
 
+
+## 17.1
+map(mtcars, mean)
+
+## 17.2
+map(.x = mtcars, .f = ~mean(x = ., trim = 0.05))
+
+## 17.3
+nycflights13::flights %>% 
+  map(.f = class)
+
+## 17.4
+iris %>% 
+  map(.f = n_distinct)
+
+## 17.5 
+list <- c(1:4)
+list^2
+
+vector <- c(1:10)
+vector^2
+
+## 18
+return_mean <- function(.data, plot = TRUE) {
+  
+  .data <- .data %>% 
+    select_if(~ is.numeric(.)) %>% 
+    map_df(.f = mean)
+  
+  print(.data)
+
+  if(plot) {
+    
+  .data %>% 
+      pivot_longer(everything(), names_to = "variable", values_to = "mean") %>% 
+      ggplot(aes(variable, mean)) +
+      geom_bar(stat = 'identity', fill = 'forestgreen', color = 'black') +
+      geom_label(aes(label = round(mean, 2))) + 
+      theme_bw() +
+      coord_flip()
+  }
+}
+return_mean(iris)
+
+
+## 19
+library(ranger)
+
+mod_ranger <- ranger::ranger(Species ~ ., 
+                     data = iris, 
+                     importance = "permutation")
+
+
+plot_importance <- function(mod_ranger) {
+  
+mod_ranger %>% 
+  ranger::importance() %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "variable") %>% 
+  rename(importance = ".") %>% 
+  mutate(variable = fct_reorder(variable, importance, .desc = FALSE)) %>% 
+  
+  ggplot(aes(variable, importance)) +
+  geom_bar(stat = 'identity', fill = 'forestgreen', color = 'black') +
+  theme_bw() +
+  coord_flip()
+  
+}
+plot_importance(mod_ranger)
+
+## 20
+
+model_lm <- lm(mpg ~ ., data = mtcars)
+model_rf <- ranger::ranger(mpg ~ ., data = mtcars)
+
+df <- tibble(truth = mtcars$mpg, 
+             pred1 = model_lm$fitted.values, 
+             pred2 = model_rf$predictions)
+
+
+dual_lift <- function(.data) {
+  
+  .data %>% 
+    mutate(diff = pred1 - pred2)
+    
+}
+
