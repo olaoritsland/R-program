@@ -1,3 +1,18 @@
+
+
+
+# JP: 
+# Veldig bra jobbet, Ola! Jeg har lagt inn noen kommentarer markert med "JP" i scriptet ditt. 
+
+
+# JP:
+# Kommentar til bruk av github: 
+# Bra at du har committet underveis! Ta gjerne en titt på best practice for 
+# å skrive commit message i slidene fra sesjon 2, jeg tror det vil være veldig 
+# nyttig for deg på prosjekt. 
+
+
+
 ## vektorer til påfølgende oppgaver
 x <- c(1, 2, 3, 10)
 y <- c(4, 5, 6, 23)
@@ -17,6 +32,9 @@ compute_vector <- function(x, y, operator) {
 }
 compute_vector(x, y, operator = "+")
 compute_vector(x, y, operator = "*")
+
+# JP:
+# To fluer i en smekk, kult! 
 
 ## 2.3 Feilmelding
 kvadrer_x <- function(x = NA) {
@@ -50,8 +68,21 @@ dplyr::if_else(integer %% 2 == 0, TRUE, FALSE)
 }
 er_partall(2)
 
+# JP:
+# Bra!
+# Tips: "integer %% 2 == 0" returnerer allerede TRUE eller FALSE pga sammenligningen
+# "==". Det er derfor ikke nødvendig med if_else() som returnerer akkurat det samme. 
+# Da kunne man fått kortere og mer lettlest funksjon. Se løsningsforslag for eksempel. 
+
+
 ## 2.8 IF ELSE IFELSE
 ### IF er raskere ettersom den kun evaluerer det første argumentet, mens IFELSE evaluerer begge argumentene
+
+# JP:
+# Riktig det, men hovedpoenget er at IF - som kun evaluerer det første argumentet - 
+# bør brukes som control flow operator til å styre hva som skjer i et script / 
+# en funksjon, mens ifelse() passer utmerket til vektorisert transformasjon. 
+
 
 ## 2.9 Funksjonen virker
 lag_histogram <-  function(.data, variabel) {
@@ -77,6 +108,9 @@ god_ <- function(date = lubridate::now()) {
   
 }
 god_()
+
+# JP:
+# Nydelig! Enkelt og greit :) 
 
 ## 4.0 Konverteringer 1
 convert_temp <- function(temperature, from_scale, to_scale) {
@@ -104,6 +138,20 @@ convert_temp(temperature = 64, from_scale = "F", to_scale = "C")
 convert_temp(temperature = 0, from_scale = "C", to_scale = "F")
 convert_temp(temperature = 100, from_scale = "C", to_scale = "F")
 
+# JP:
+# Veldig kult! 
+# 
+# Dersom du ville ha utvidet på denne funksjonen kunne man f.eks. ha hatt logikk
+# som sørget for at dersom "from_scale" var satt, men to_scale var missing (eller omvendt),
+# så ble to_scale automatisk en annen verdi enn from_scale. 
+# Eks: convert_temp(temperature = 32, from_scale = "F") --> "0 °C"
+# 
+# Husk forresten at characters ikke kan brukes videre til numeriske beregninger.
+# Så dersom funksjonen skulle fungere i en pipe kunne det vært bedre å returnere tallet
+# uten "F" eller "C" bak. Dette kommer kun an på hva man planlegger å bruke funksjonen til. 
+
+
+
 ## 5.0 DingDong
 dingdong <- function(v) {
   
@@ -121,6 +169,7 @@ as.vector(t(v))
 }
 dingdong(c(1:100))
 
+
 ## 6.0 Print all
 print_all <- function(data) {
   
@@ -136,6 +185,13 @@ gen_pwd <- function(length = 16) {
   paste(string, collapse = "")
 }
 gen_pwd()
+
+# JP:
+# Veldig bra løsning! Husk forresten at i "sample" så er "replace" FALSE som default. 
+# Dermed kan man kun bruke ett tegn én gang slik det er nå. Dersom man setter replace
+# til TRUE kan får man ett passord som er over 8 ganger så sikkert (8.33 ganger flere
+# mulige kombinasjoner gitt et 16-bokstavs passord).
+
 
 ## 8.0 NA-funksjoner
 ###na_summarise <- function(data, var) {
@@ -190,6 +246,9 @@ data %>%
 }
 na_summarise_all(airquality)
 
+# JP:
+# Denne funket ikke for meg. 
+
 ## 9.0 Innlasting av mange datafiler
 file_paths <- fs::dir_ls(path = "./data/Karakterer_per_fylke", regexp = "\\.csv$")
 
@@ -222,6 +281,10 @@ finn_beste_fylke <- function(.year, .fag, .kjonn) {
 }
 finn_beste_fylke(.kjonn = "Jenter", .fag = "Mat og helse")
 
+# JP:
+# Lurt å legge til kjønn og fag som ekstra variabler å filtrere på! 
+
+
 ## 10 Fleksible plots
 lag_plot <- function(.data, .x, .y, plot_type = "dot", color_by, theme = theme_minimal()) {
   
@@ -252,7 +315,10 @@ lag_plot <- function(.data, .x, .y, plot_type = "dot", color_by, theme = theme_m
 lag_plot(iris, Sepal.Length, Sepal.Width, color_by = Species, theme = theme_bw())
 lag_plot(.data = iris, .x = Species, .y = Sepal.Length, plot_type = "bar", theme = theme_bw())
 lag_plot(mtcars, as.factor(cyl), hp,plot_type = "bar")
-lag_plot(mtcars, mpg, hp, color_by = as.factor(cyl), theme = theme_bw())
+lag_plot(mtcars, mpg, hp, color_by = as.factor(cyl), theme = theme_void())
+
+# JP:
+# Knallbra!
 
 ## 11 Konverteringer 2
 mpg_to_kpl <- function(mpg) {
@@ -355,6 +421,15 @@ which_max <- function(x) {
 }
 which_max(runif(10, 0, 10))
 
+# JP:
+# Elegant! Men merk at denne funksjonen vil returnere alle index-posisjonene som
+# er lik maksverdi (mens which.max() kun returnerer det første). Feks: 
+# which_max(c(10, 8, 10))
+# which.max(c(10, 8, 10))
+# 
+# Dette kan være akkurat det du er ute etter, men hvis ikke så fikser du det lett
+# med en "[1]" bak `which(max(x) == x)` inne i funksjonen. 
+
 
 ## 17.1
 map(mtcars, mean)
@@ -399,6 +474,8 @@ return_mean <- function(.data, plot = TRUE) {
 }
 return_mean(iris)
 
+# JP:
+# Nice! 
 
 ## 19
 library(ranger)
@@ -425,6 +502,11 @@ mod_ranger %>%
 }
 plot_importance(mod_ranger)
 
+# JP:
+# Veldig bra!
+# Tips: rename er en av de funksjoene som er lurt å spesifisere hvilken pakke de kommer fra.
+# Her: dplyr::rename(). Jeg fikk først feilmelding her fordi reshape (som ble brukt under Rescale-oppgaven)
+# også har en rename-funksjon.
 
 
 
